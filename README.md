@@ -1,4 +1,6 @@
 # Chatbot-server
+
+```text
 Chatbot-server/
 ├── .env.example
 ├── .gitignore
@@ -22,3 +24,4 @@ Chatbot-server/
 │   └── ingest_policies.py
 └── widget/
     └── chatbot-widget.js
+```
