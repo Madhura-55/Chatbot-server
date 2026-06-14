@@ -25,3 +25,23 @@ Chatbot-server/
 └── widget/
     └── chatbot-widget.js
 ```
+
+
+```text
+Policy Documents
+       │
+       ▼
+Embedding Model (Gemini/OpenAI/etc.)
+       │
+       ▼
+Vector Database (ChromaDB/Pinecone/etc.)
+       │
+       ▼
+Retriever
+       │
+       ▼
+LLM (via OpenRouter)
+       │
+       ▼
+Answer
+```
