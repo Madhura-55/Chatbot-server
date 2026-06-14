@@ -19,7 +19,7 @@ from pathlib import Path
 from loguru import logger
 
 from config import get_settings
-from services import VectorStoreService, GeminiService
+from services import VectorStoreService, EmbeddingService
 
 
 POLICIES_DIR = Path(__file__).resolve().parent.parent / "data" / "policies"
@@ -98,7 +98,7 @@ def main():
         raise SystemExit("GEMINI_API_KEY is not set. Please configure your .env file.")
 
     logger.info("Initializing services...")
-    gemini = GeminiService()
+    embeddings = EmbeddingService()
     vector_store = VectorStoreService()
     vector_store.connect()
 
@@ -127,12 +127,12 @@ def main():
             "source_file": chunk["source_file"],
         })
 
-    embeddings = gemini.embed_batch(documents, task_type="retrieval_document")
+    embeddings_list = embeddings.embed_batch(documents, task_type="retrieval_document")
 
     vector_store.upsert_documents(
         ids=ids,
         documents=documents,
-        embeddings=embeddings,
+        embeddings=embeddings_list,
         metadatas=metadatas,
     )
 

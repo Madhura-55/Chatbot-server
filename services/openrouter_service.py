@@ -1,61 +1,38 @@
 """
-Gemini Service
+OpenRouter Service
 
-Wraps Google's Gemini API for:
-- Generating embeddings (for ChromaDB ingestion and queries)
-- Generating chat completions (RAG-augmented responses)
+Wraps OpenRouter's OpenAI-compatible chat completions API for:
+- Generating RAG-augmented chat responses
 - Lightweight intent classification
 
-Uses the free tier of Gemini (gemini-1.5-flash + text-embedding-004).
+Uses the official `openai` SDK pointed at OpenRouter's base URL.
+Free-tier models (suffixed ':free') are available, e.g.
+'meta-llama/llama-3.1-8b-instruct:free'.
 """
 
 from typing import Optional
-import google.generativeai as genai
+from openai import OpenAI
 from loguru import logger
 
 from config import get_settings, SYSTEM_PROMPT, INTENT_LABELS
 
 
-class GeminiService:
-    """Service for interacting with Google's Gemini API."""
+class OpenRouterService:
+    """Service for interacting with OpenRouter's chat completion API."""
 
     def __init__(self):
         self.settings = get_settings()
-        genai.configure(api_key=self.settings.gemini_api_key)
 
-        self._chat_model = genai.GenerativeModel(
-            model_name=self.settings.gemini_model,
-            system_instruction=SYSTEM_PROMPT,
+        self._client = OpenAI(
+            base_url=self.settings.openrouter_base_url,
+            api_key=self.settings.openrouter_api_key,
         )
 
-        # Lightweight model for fast intent classification
-        self._intent_model = genai.GenerativeModel(
-            model_name=self.settings.gemini_model,
-        )
-
-    # =========================================================================
-    # EMBEDDINGS
-    # =========================================================================
-
-    def embed_text(self, text: str, task_type: str = "retrieval_document") -> list[float]:
-        """
-        Generate an embedding vector for a single piece of text.
-
-        task_type options: 'retrieval_document', 'retrieval_query'
-        """
-        result = genai.embed_content(
-            model=self.settings.gemini_embedding_model,
-            content=text,
-            task_type=task_type,
-        )
-        return result["embedding"]
-
-    def embed_batch(self, texts: list[str], task_type: str = "retrieval_document") -> list[list[float]]:
-        """Generate embeddings for a batch of texts."""
-        embeddings = []
-        for text in texts:
-            embeddings.append(self.embed_text(text, task_type=task_type))
-        return embeddings
+        # Extra headers recommended by OpenRouter for attribution/rankings
+        self._extra_headers = {
+            "HTTP-Referer": self.settings.openrouter_site_url,
+            "X-Title": self.settings.openrouter_site_name,
+        }
 
     # =========================================================================
     # INTENT CLASSIFICATION
@@ -80,8 +57,14 @@ Message: "{message}"
 Category:"""
 
         try:
-            response = self._intent_model.generate_content(prompt)
-            label = response.text.strip().lower()
+            response = self._client.chat.completions.create(
+                model=self.settings.openrouter_model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=20,
+                extra_headers=self._extra_headers,
+            )
+            label = response.choices[0].message.content.strip().lower()
 
             for valid_label in INTENT_LABELS:
                 if valid_label in label:
@@ -110,12 +93,11 @@ Category:"""
             context: Retrieved context (product/order/policy data) as text.
             chat_history: Previous turns as [{"role": "user"|"model", "text": str}]
         """
-        history = []
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
         for turn in (chat_history or []):
-            history.append({
-                "role": turn["role"],
-                "parts": [turn["text"]],
-            })
+            role = "assistant" if turn["role"] == "model" else "user"
+            messages.append({"role": role, "content": turn["text"]})
 
         prompt = f"""Context information:
 {context if context.strip() else "No additional context was found for this query."}
@@ -124,12 +106,19 @@ Customer message: {user_message}
 
 Using the context above (if relevant), respond to the customer's message following your guidelines."""
 
+        messages.append({"role": "user", "content": prompt})
+
         try:
-            chat = self._chat_model.start_chat(history=history)
-            response = chat.send_message(prompt)
-            return response.text.strip()
+            response = self._client.chat.completions.create(
+                model=self.settings.openrouter_model,
+                messages=messages,
+                temperature=0.4,
+                max_tokens=400,
+                extra_headers=self._extra_headers,
+            )
+            return response.choices[0].message.content.strip()
         except Exception as e:
-            logger.error(f"Gemini generation failed: {e}")
+            logger.error(f"OpenRouter generation failed: {e}")
             return (
                 "Sorry, I'm having trouble processing your request right now. "
                 "Please try again in a moment, or contact our support team for help."

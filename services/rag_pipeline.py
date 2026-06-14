@@ -2,11 +2,14 @@
 RAG Pipeline Service
 
 Orchestrates the full request flow:
-1. Classify user intent
+1. Classify user intent (via OpenRouter)
 2. Retrieve relevant context from MongoDB (products/orders) and/or
    ChromaDB (policy documents) based on intent
-3. Generate a grounded response via Gemini
+3. Generate a grounded response via OpenRouter
 4. Maintain short-lived in-memory chat session history
+
+Note: embeddings are generated via Gemini (EmbeddingService) since
+OpenRouter does not provide an embeddings endpoint.
 """
 
 import re
@@ -17,7 +20,8 @@ from loguru import logger
 from config import get_settings
 from .mongo_service import MongoService
 from .vector_store import VectorStoreService
-from .gemini_service import GeminiService
+from .embedding_service import EmbeddingService
+from .openrouter_service import OpenRouterService
 
 
 # Matches a 24-character hex string (MongoDB ObjectId)
@@ -31,12 +35,14 @@ class RAGPipeline:
         self,
         mongo_service: MongoService,
         vector_store: VectorStoreService,
-        gemini_service: GeminiService,
+        embedding_service: EmbeddingService,
+        llm_service: OpenRouterService,
     ):
         self.settings = get_settings()
         self.mongo = mongo_service
         self.vector_store = vector_store
-        self.gemini = gemini_service
+        self.embeddings = embedding_service
+        self.llm = llm_service
 
         # In-memory session store: session_id -> {"history": [...], "last_active": ts}
         self._sessions: dict[str, dict] = {}
@@ -97,7 +103,7 @@ class RAGPipeline:
         """
         session = self._get_session(session_id)
 
-        intent = self.gemini.classify_intent(message)
+        intent = self.llm.classify_intent(message)
         logger.info(f"Session {session_id}: intent='{intent}' message='{message[:80]}'")
 
         context_text = ""
@@ -113,7 +119,7 @@ class RAGPipeline:
             # For general chat, still try a light policy lookup in case it's relevant
             context_text, sources = self._build_policy_context(message, n_results=2)
 
-        response_text = self.gemini.generate_response(
+        response_text = self.llm.generate_response(
             user_message=message,
             context=context_text,
             chat_history=session["history"],
@@ -198,7 +204,7 @@ class RAGPipeline:
         n = n_results or self.settings.max_context_docs
 
         try:
-            query_embedding = self.gemini.embed_text(message, task_type="retrieval_query")
+            query_embedding = self.embeddings.embed_text(message, task_type="retrieval_query")
             results = self.vector_store.query(query_embedding, n_results=n)
         except Exception as e:
             logger.error(f"Policy retrieval failed: {e}")

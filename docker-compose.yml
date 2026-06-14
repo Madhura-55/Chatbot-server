@@ -14,8 +14,12 @@ services:
       - DEBUG=false
       - MONGODB_URI=${MONGODB_URI:-mongodb://host.docker.internal:27017}
       - MONGODB_DB_NAME=${MONGODB_DB_NAME:-deligo}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-meta-llama/llama-3.1-8b-instruct:free}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - OPENROUTER_SITE_URL=${OPENROUTER_SITE_URL:-http://localhost:3000}
+      - OPENROUTER_SITE_NAME=${OPENROUTER_SITE_NAME:-Deligo}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
       - GEMINI_EMBEDDING_MODEL=${GEMINI_EMBEDDING_MODEL:-models/text-embedding-004}
       - CHROMA_PERSIST_DIR=/app/chroma_db
       - CHROMA_COLLECTION_NAME=${CHROMA_COLLECTION_NAME:-deligo_policies}

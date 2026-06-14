@@ -29,7 +29,9 @@ from loguru import logger
 import sys
 
 from config import get_settings
-from services import MongoService, VectorStoreService, GeminiService, RAGPipeline
+from services import MongoService, VectorStoreService, EmbeddingService, OpenRouterService, RAGPipeline
+
+
 
 
 # Configure logging
@@ -45,7 +47,8 @@ settings = get_settings()
 # Global service instances
 mongo_service: Optional[MongoService] = None
 vector_store: Optional[VectorStoreService] = None
-gemini_service: Optional[GeminiService] = None
+embedding_service: Optional[EmbeddingService] = None
+llm_service: Optional[OpenRouterService] = None
 rag_pipeline: Optional[RAGPipeline] = None
 
 
@@ -87,7 +90,7 @@ class StatusResponse(BaseModel):
     service: str
     is_ready: bool
     vector_store_docs: int
-    gemini_model: str
+    chat_model: str
     active_sessions: int
 
 
@@ -108,7 +111,8 @@ async def lifespan(app: FastAPI):
     vector_store = VectorStoreService()
     vector_store.connect()
 
-    gemini_service = GeminiService()
+    embedding_service = EmbeddingService()
+    llm_service = OpenRouterService()
 
     rag_pipeline = RAGPipeline(
         mongo_service=mongo_service,
@@ -176,7 +180,7 @@ async def get_status():
         service="deligo-rag-chatbot",
         is_ready=rag_pipeline is not None,
         vector_store_docs=doc_count,
-        gemini_model=settings.gemini_model,
+        chat_model=settings.openrouter_model,
         active_sessions=session_count,
     )
 

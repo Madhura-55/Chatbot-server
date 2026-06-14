@@ -20,9 +20,15 @@ class Settings(BaseSettings):
     mongodb_uri: str = Field(default="mongodb://localhost:27017")
     mongodb_db_name: str = Field(default="deligo")
 
-    # Gemini Configuration
+    # OpenRouter Configuration (chat completions)
+    openrouter_api_key: str = Field(default="")
+    openrouter_model: str = Field(default="meta-llama/llama-3.1-8b-instruct:free")
+    openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1")
+    openrouter_site_url: str = Field(default="http://localhost:3000")
+    openrouter_site_name: str = Field(default="Deligo")
+
+    # Gemini Configuration (embeddings only)
     gemini_api_key: str = Field(default="")
-    gemini_model: str = Field(default="gemini-1.5-flash")
     gemini_embedding_model: str = Field(default="models/text-embedding-004")
 
     # ChromaDB Configuration
